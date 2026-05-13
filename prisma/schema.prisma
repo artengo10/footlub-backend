@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Пользователи ─────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  password   String
+  verified   Boolean  @default(false)
+  firstName  String?
+  lastName   String?
+  patronymic String?
+  phone      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  address   Address?
+  orders    Order[]
+  footScans FootScan[]
+}
+
+// ─── OTP-коды (временные, до верификации) ─────────────────────────────────────
+// Пользователь попадает в User только после подтверждения кода (/auth/verify).
+// Незаверифицированные User с verified=false + неиспользованные OtpCode
+// можно периодически чистить через CRON.
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ─── Заказы ───────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  status          OrderStatus @default(PENDING)
+
+  // Параметры выбора
+  category        String?     // sneakers | heels | boots | sport | casual | other
+  insoleType      String?     // comfort | performance | luxury
+  pairs           Int?
+  shoeSize        String?
+  insoleSize      String?
+  footLength      String?     // длина стопы в см (из анкеты)
+  heelLift        Int         @default(0) // подъём пятки в см (0–5)
+  price           Float?
+
+  // Доставка
+  contactName     String?
+  contactPhone    String?
+  deliveryAddress String?
+
+  // Связь со сканом (появится после интеграции ARKit)
+  footScan        FootScan?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum OrderStatus {
+  PENDING     // Ожидает оплаты
+  CONFIRMED   // Оплачен, ждёт производства
+  PRODUCTION  // В производстве
+  SHIPPED     // Отправлен
+  DELIVERED   // Доставлен
+  CANCELLED   // Отменён
+}
+
+// ─── Результаты сканирования TrueDepth ────────────────────────────────────────
+// Заполняется после интеграции react-native-vision-camera + ARKit.
+// Пока данные вводятся вручную в анкете.
+
+model FootScan {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  orderId   String? @unique
+  order     Order?  @relation(fields: [orderId], references: [id])
+
+  // Данные из ARKit TrueDepth (миллиметры)
+  lengthMm  Float?
+  widthMm   Float?
+
+  // Тип свода стопы
+  archType  ArchType @default(MEDIUM)
+
+  // Пронация
+  pronation PronationType @default(NEUTRAL)
+
+  // Сырые данные ARKit для будущего анализа (JSON-blob)
+  rawData   Json?
+
+  scannedAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum ArchType {
+  HIGH    // Высокий свод
+  MEDIUM  // Средний (норма)
+  FLAT    // Плоскостопие
+}
+
+enum PronationType {
+  INWARD   // Гиперпронация (заваливается внутрь)
+  NEUTRAL  // Нейтральная
+  OUTWARD  // Супинация (наружу)
+}
+
+// ─── Статьи блога ─────────────────────────────────────────────────────────────
+
+model Post {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  excerpt   String
+  content   String
+  imageUrl  String?
+  category  String?
+  readTime  Int      @default(5)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([createdAt])
+  @@index([category])
+}
+
+// ─── Адрес доставки ───────────────────────────────────────────────────────────
+
+model Address {
+  id     String  @id @default(cuid())
+  userId String  @unique
+  user   User    @relation(fields: [userId], references: [id])
+  full   String? // полный адрес одной строкой
+  city   String?
+  street String?
+  house  String?
+  apt    String?
+}
