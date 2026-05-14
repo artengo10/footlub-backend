@@ -1,13 +1,12 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function sendOtpEmail(to: string, code: string) {
   if (process.env.NODE_ENV !== 'production') {
     console.log(`\n📬 OTP for ${to}: \x1b[33m${code}\x1b[0m\n`);
     return;
   }
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { error } = await resend.emails.send({
     from: 'FootLub <noreply@footlub.ru>',
     to,
