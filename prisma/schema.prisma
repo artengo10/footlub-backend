@@ -83,8 +83,11 @@ enum OrderStatus {
 }
 
 // ─── Результаты сканирования TrueDepth ────────────────────────────────────────
-// Заполняется после интеграции react-native-vision-camera + ARKit.
-// Пока данные вводятся вручную в анкете.
+// Заполняется через POST /orders/:id/scan сразу после оформления заказа — STL
+// стельки строится НА УСТРОЙСТВЕ (modules/foot-mesh-viewer, приложение footlab-app),
+// сюда попадают только готовые файлы (ключи в Yandex Object Storage) + сырые данные
+// скана целиком (все 8 шагов, не только использованные для меша) — задел на
+// пересборку STL улучшенным алгоритмом без повторного скана клиента.
 
 model FootScan {
   id        String @id @default(cuid())
@@ -93,7 +96,9 @@ model FootScan {
   orderId   String? @unique
   order     Order?  @relation(fields: [orderId], references: [id])
 
-  // Данные из ARKit TrueDepth (миллиметры)
+  // Данные из ARKit TrueDepth (миллиметры) — пока не заполняется (footLength
+  // вводится вручную в анкете), задел на будущее извлечение размеров из
+  // top/inner/outer сканов.
   lengthMm  Float?
   widthMm   Float?
 
@@ -103,8 +108,15 @@ model FootScan {
   // Пронация
   pronation PronationType @default(NEUTRAL)
 
-  // Сырые данные ARKit для будущего анализа (JSON-blob)
+  // Сырые данные скана целиком (JSON-blob) — если хранится в Object Storage,
+  // см. rawDataKey ниже; поле оставлено на случай мелких/тестовых данных.
   rawData   Json?
+
+  // Ключи объектов в Yandex Object Storage (scans/{orderId}/...)
+  rightStlKey   String?
+  leftStlKey    String?
+  rawDataKey    String?
+  stlUploadedAt DateTime?
 
   scannedAt DateTime @default(now())
 
