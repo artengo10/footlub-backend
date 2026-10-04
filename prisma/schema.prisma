@@ -117,6 +117,12 @@ model FootScan {
   leftStlKey    String?
   rawDataKey    String?
   stlUploadedAt DateTime?
+  // Фото ракурсов (ключи scans/{orderId}/photos/*.jpg) и замеры с телефона
+  // (FootMeasurements: на весу/стоя, свод) — пишутся только после проверки
+  // HeadObject в POST /orders/:id/scan/complete.
+  photoKeys     String[]  @default([])
+  archHeightMm  Float?
+  measurements  Json?
 
   scannedAt DateTime @default(now())
 

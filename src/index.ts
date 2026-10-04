@@ -7,6 +7,7 @@ import authRouter from './routes/auth';
 import ordersRouter from './routes/orders';
 import profileRouter from './routes/profile';
 import postsRouter from './routes/posts';
+import adminRouter from './routes/admin';
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use('/auth', authRouter);
 app.use('/orders', ordersRouter);
+app.use('/admin', adminRouter);
 app.use('/profile', profileRouter);
 app.use('/posts', postsRouter);
 
