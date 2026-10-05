@@ -45,7 +45,13 @@ export async function objectSize(key: string): Promise<number | null> {
   }
 }
 
-/** Подписанная GET-ссылка (по умолчанию 1 час) — только для админа. */
-export async function presignDownload(key: string, expiresSec = 3600): Promise<string> {
-  return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket(), Key: key }), { expiresIn: expiresSec });
+/** Подписанная GET-ссылка (по умолчанию 1 час) — только для админа.
+ * filename — имя, с которым файл скачается в браузере (сам объект в бакете не переименовывается). */
+export async function presignDownload(key: string, expiresSec = 3600, filename?: string): Promise<string> {
+  const disposition = filename ? `attachment; filename*=UTF-8''${encodeURIComponent(filename)}` : undefined;
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: bucket(), Key: key, ResponseContentDisposition: disposition }),
+    { expiresIn: expiresSec },
+  );
 }
