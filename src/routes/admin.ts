@@ -57,4 +57,50 @@ router.get('/scans/:id/download-url', async (req: Request, res: Response) => {
   }
 });
 
+// GET /admin/orders — последние заказы со статусом скана (ссылок на файлы здесь нет).
+router.get('/orders', async (req: Request, res: Response) => {
+  try {
+    requireAdmin(req);
+    const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
+    const scans = await prisma.footScan.findMany({ where: { orderId: { in: orders.map((o) => o.id) } } });
+    const users = await prisma.user.findMany({
+      where: { id: { in: [...new Set(orders.map((o) => o.userId))] } },
+      select: { id: true, email: true },
+    });
+    const emailById = new Map(users.map((u) => [u.id, u.email]));
+    const scanByOrder = new Map(scans.map((s) => [s.orderId, s]));
+    res.json({
+      orders: orders.map((o) => {
+        const s = scanByOrder.get(o.id);
+        return {
+          id: o.id,
+          createdAt: o.createdAt,
+          status: o.status,
+          email: emailById.get(o.userId) ?? null,
+          shoeSize: o.shoeSize,
+          insoleType: o.insoleType,
+          price: o.price,
+          scan: s
+            ? {
+                id: s.id,
+                right: !!s.rightStlKey,
+                left: !!s.leftStlKey,
+                raw: !!s.rawDataKey,
+                photos: s.photoKeys.length,
+                lengthMm: s.lengthMm,
+                widthMm: s.widthMm,
+                uploadedAt: s.stlUploadedAt,
+              }
+            : null,
+        };
+      }),
+    });
+  } catch (err: any) {
+    if (err.status === 401) return res.status(401).json({ error: 'Не авторизован' });
+    if (err.status === 403) return res.status(403).json({ error: 'Нет доступа' });
+    console.error('[admin/orders]', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;
