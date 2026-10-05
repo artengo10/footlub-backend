@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { presignUpload, objectSize } from '../lib/s3';
-import { notifyNewScan } from '../lib/telegram';
+import { notifyNewScan } from '../lib/notify';
 
 const router = Router();
 
@@ -159,15 +159,18 @@ router.post('/:id/scan/complete', async (req: Request, res: Response) => {
       measurements: m ?? undefined,
       stlUploadedAt: new Date(),
     };
+    const previous = await prisma.footScan.findUnique({ where: { orderId: order.id } });
     const scan = await prisma.footScan.upsert({
       where: { orderId: order.id },
       update: data,
       create: { userId, orderId: order.id, ...data },
     });
 
-    // Уведомление — без подписанных ссылок на файлы; сбой Telegram не ломает ответ.
-    notifyNewScan({ orderId: order.id, shoeSize: order.shoeSize, lengthMm: data.lengthMm, widthMm: data.widthMm })
-      .catch((e) => console.error('[telegram]', e));
+    // Письмо владельцу — один раз, при первой загрузке скана по подтверждённому заказу.
+    if (!previous?.stlUploadedAt && order.status === 'CONFIRMED') {
+      notifyNewScan({ orderId: order.id, shoeSize: order.shoeSize, lengthMm: data.lengthMm, widthMm: data.widthMm })
+        .catch((e) => console.error('[notify]', e));
+    }
 
     res.json({ ok: true, scanId: scan.id, stored: present });
   } catch (err: any) {
